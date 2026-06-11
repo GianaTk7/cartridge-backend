@@ -232,7 +232,7 @@ async def seed_products():
                 "price": 649,
                 "originalPrice": 749,
                 "discount": 13,
-                "image": "/samsun10.jpg",
+                "image": "/samsung1.jpg",
                 "compatiblePrinters": "Samsung ML-2165W, ML-2160",
                 "stock": 25,
                 "createdAt": datetime.now()
