@@ -8,3 +8,4 @@ MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
 client = AsyncIOMotorClient(MONGODB_URI)
 db = client["Rose_db"]
 products = db["products"]
+# new collection will be added
