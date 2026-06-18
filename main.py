@@ -10,6 +10,7 @@ from typing import Optional, List
 load_dotenv()
 
 app = FastAPI(title="Cartridge Shop API")
+app.mount("/images", StaticFiles(directory="images"), name="images")
 
 # CORS middleware - allow frontend to connect
 app.add_middleware(
