@@ -198,7 +198,6 @@ async def create_admin(
     except Exception as e:
         return {"success": False, "message": str(e)}
 
-# Get all admins (protected)
 @app.get("/api/admin/all")
 async def get_all_admins(payload: dict = Depends(verify_token)):
     """
@@ -210,7 +209,6 @@ async def get_all_admins(payload: dict = Depends(verify_token)):
         
         admins = []
         async for admin in admin_collection.find():
-            # Don't send password
             admin_dict = admin_helper(admin)
             admins.append(admin_dict)
         
@@ -275,13 +273,12 @@ async def import_product(
     stock: int = Form(...),
     category: str = Form(...),
     image: UploadFile = File(...),
-    payload: dict = Depends(verify_token)  # Require authentication
+    payload: dict = Depends(verify_token)  
 ):
     """
     Import a new product with image upload - Admin only
     """
     try:
-        # Optional: Check if user has admin role
         if payload.get("role") not in ["admin", "super_admin"]:
             raise HTTPException(status_code=403, detail="Admin access required")
         
