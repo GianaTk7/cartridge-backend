@@ -27,7 +27,7 @@ app.mount("/images", StaticFiles(directory="images"), name="images")
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://localhost:8000"],
+    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://localhost:8000", "http://127.0.0.1:3000", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -39,6 +39,8 @@ db = client["Rose_db"]
 products_collection = db["products"]
 Login_collection = db["Login"]  
 
+# ========== HELPER FUNCTIONS ==========
+
 def product_helper(product) -> dict:
     return {
         "id": str(product["_id"]),
@@ -47,6 +49,7 @@ def product_helper(product) -> dict:
         "brand": product.get("brand", ""),
         "description": product.get("description", ""),
         "price": product.get("price", 0),
+        "originalPrice": product.get("originalPrice", 0),
         "image": product.get("image", "https://via.placeholder.com/500"),
         "stock": product.get("stock", 10),
         "category": product.get("category", ""),
@@ -71,7 +74,6 @@ def create_access_token(data: dict):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-# Verify JWT token
 async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     token = credentials.credentials
     try:
@@ -80,21 +82,17 @@ async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(secur
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid authentication credentials")
 
-# Hash password
 def hash_password(password: str) -> str:
     salt = bcrypt.gensalt()
     return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
 
-# Verify password
 def verify_password(password: str, hashed: str) -> bool:
     return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
 
-# Initialize Login user with YOUR credentials
+# ========== AUTH ENDPOINTS ==========
+
 @app.post("/api/Login")
 async def setup_Login():
-    """
-    Setup initial Login user - run this once
-    """
     try:
         existing_Login = await Login_collection.find_one({"username": "Rose"})
         if existing_Login:
@@ -125,9 +123,6 @@ async def Login_login(
     username: str = Form(...), 
     password: str = Form(...)
 ):
-    """
-    Login login endpoint
-    """
     try:
         Login = await Login_collection.find_one({"username": username})
         
@@ -160,7 +155,6 @@ async def Login_login(
     except Exception as e:
         return {"success": False, "message": str(e)}
 
-
 @app.post("/api/Login/create")
 async def create_Login(
     username: str = Form(...),
@@ -169,9 +163,6 @@ async def create_Login(
     role: str = Form("Login"),
     payload: dict = Depends(verify_token)
 ):
-    """
-    Create a new Login - only super_Login can do this
-    """
     try:
         if payload.get("role") != "super_Login":
             raise HTTPException(status_code=403, detail="Permission denied")
@@ -197,9 +188,6 @@ async def create_Login(
 
 @app.get("/api/Login/all")
 async def get_all_Logins(payload: dict = Depends(verify_token)):
-    """
-    Get all Logins - only super_Login can do this
-    """
     try:
         if payload.get("role") != "super_Login":
             raise HTTPException(status_code=403, detail="Permission denied")
@@ -215,9 +203,6 @@ async def get_all_Logins(payload: dict = Depends(verify_token)):
 
 @app.get("/api/Login/profile")
 async def get_Login_profile(payload: dict = Depends(verify_token)):
-    """
-    Get current Login profile
-    """
     try:
         Login = await Login_collection.find_one({"_id": ObjectId(payload.get("sub"))})
         if not Login:
@@ -233,19 +218,14 @@ async def change_password(
     new_password: str = Form(...),
     payload: dict = Depends(verify_token)
 ):
-    """
-    Change Login password
-    """
     try:
         Login = await Login_collection.find_one({"_id": ObjectId(payload.get("sub"))})
         if not Login:
             return {"success": False, "message": "Login not found"}
         
-        # Verify old password
         if not verify_password(old_password, Login["password"]):
             return {"success": False, "message": "Current password is incorrect"}
         
-        # Update password
         await Login_collection.update_one(
             {"_id": ObjectId(payload.get("sub"))},
             {"$set": {"password": hash_password(new_password)}}
@@ -255,7 +235,7 @@ async def change_password(
     except Exception as e:
         return {"success": False, "message": str(e)}
 
-# ==================== PRODUCT ENDPOINTS ====================
+# ========== PRODUCT ENDPOINTS ==========
 
 @app.post("/api/products/import")
 async def import_product(
@@ -263,9 +243,10 @@ async def import_product(
     brand: str = Form(...),
     description: str = Form(...),
     price: float = Form(...),
+    originalPrice: Optional[float] = Form(0),
     stock: int = Form(...),
     category: str = Form(...),
-    Tags: str = Form(""),
+    Tags: Optional[str] = Form(""),
     image: UploadFile = File(...),
     payload: dict = Depends(verify_token)  
 ):
@@ -288,6 +269,7 @@ async def import_product(
             "brand": brand.lower(),
             "description": description,
             "price": price,
+            "originalPrice": originalPrice,
             "image": f"/images/{unique_filename}",
             "stock": stock,
             "category": category,
@@ -354,9 +336,6 @@ async def update_product(
     product_data: dict,
     payload: dict = Depends(verify_token)
 ):
-    """
-    Update a product - Login only
-    """
     try:
         if payload.get("role") not in ["Login", "super_Login"]:
             raise HTTPException(status_code=403, detail="Login access required")
@@ -382,9 +361,6 @@ async def delete_product(
     product_id: str,
     payload: dict = Depends(verify_token)
 ):
-    """
-    Delete a product - Login only
-    """
     try:
         if payload.get("role") not in ["Login", "super_Login"]:
             raise HTTPException(status_code=403, detail="Login access required")
@@ -412,7 +388,6 @@ async def get_categories():
     except Exception as e:
         return {"success": False, "message": str(e)}
 
-# Search products (public)
 @app.get("/api/products/search")
 async def search_products(q: str = Query(..., min_length=1)):
     try:
@@ -431,7 +406,6 @@ async def search_products(q: str = Query(..., min_length=1)):
     except Exception as e:
         return {"success": False, "message": str(e), "products": []}
 
-# Test endpoint
 @app.get("/")
 async def root():
     return {"message": "Cartridge Shop API is running!", "status": "active"}
