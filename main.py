@@ -24,10 +24,21 @@ ALGORITHM = "HS256"
 os.makedirs("images", exist_ok=True)
 app.mount("/images", StaticFiles(directory="images"), name="images")
 
-# CORS middleware
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "").split(",")
+ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS if origin.strip()]
+
+if not ALLOWED_ORIGINS:
+    ALLOWED_ORIGINS = [
+        "http://localhost:5173", 
+        "http://localhost:3000", 
+        "http://localhost:8000",
+        "http://127.0.0.1:3000", 
+        "http://127.0.0.1:5173"
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://localhost:8000", "http://127.0.0.1:3000", "http://127.0.0.1:5173"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -37,7 +48,7 @@ MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
 client = AsyncIOMotorClient(MONGODB_URI)
 db = client["Rose_db"]
 products_collection = db["products"]
-Login_collection = db["Login"]  
+Login_collection = db["Login"]
 
 # ========== HELPER FUNCTIONS ==========
 
